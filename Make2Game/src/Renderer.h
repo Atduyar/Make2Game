@@ -17,6 +17,7 @@
                     GLClearError();
 
 
+class SubTexture;
 void GLClearError();
 bool GLLogCall(const char* func, int line);
 void GLErrorHandler();
@@ -31,9 +32,30 @@ public:
     double time;
 };
 
+struct Vertex
+{
+    glm::vec2 positoin;
+    glm::vec2 imageCoord;
+};
+
 class Renderer
 {
 public:
     void Draw(const VertexArray& va, const IndexBuffer& ib, const Shader& shader) const;
     void Clear();
+};
+
+
+struct BatchRenderer
+{
+public:
+    BatchRenderer(); // init
+    ~BatchRenderer();// shutdown
+
+    void BeginBatch();
+    void EndBatch();
+    void Draw();
+    void DrawQuad(const glm::vec2& positoin, const glm::vec2& size, SubTexture subTexture);
+
+    void DrawStat();
 };

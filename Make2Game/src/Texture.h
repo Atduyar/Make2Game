@@ -5,7 +5,7 @@
 class Texture
 {
 private:
-	unsigned int m_RendererID;
+	uint32_t m_RendererID;
 	std::string m_FilePath;
 	unsigned char* m_LocalBuffer;
 	int m_Width, m_Height, m_BPP;
@@ -18,4 +18,5 @@ public:
 
 	inline int GetWidth() const { return m_Width; }
 	inline int GetHeigth() const { return m_Height; }
+	inline uint32_t GetId() const { return m_RendererID; };
 };

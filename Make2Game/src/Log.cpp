@@ -83,9 +83,10 @@ void Log::Draw(const char* title, bool* p_open)
 
     for (uint32_t i = 0;i < Buf.size();i++)
     {
+        ImGui::PushID(i);
         if(Buf[i].line2 != "")
         {
-	        if (ImGui::TreeNode((void*)i,Buf[i].line.c_str()))
+	        if (ImGui::TreeNode(Buf[i].line.c_str()))
 	        {
 	            ImGui::Text(Buf[i].line2.c_str());
 	            ImGui::TreePop();
@@ -96,6 +97,7 @@ void Log::Draw(const char* title, bool* p_open)
         {
             ImGui::BulletText(Buf[i].line.c_str());
         }
+        ImGui::PopID();
     }
 
     ImGui::PopStyleVar();

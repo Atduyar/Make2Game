@@ -1,4 +1,4 @@
-// Dear ImGui: standalone example application for SDL2 + OpenGL
+﻿// Dear ImGui: standalone example application for SDL2 + OpenGL
 // (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
@@ -25,12 +25,26 @@
 #include "VertexArray.h"
 #include "IndexBuffer.h"
 #include "Log.h"
+#include "Mouse.h"
 #include "Shader.h"
 #include "Texture.h"
+#include "TextureAtlases.h"
 #include "VertexBufferLayout.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
+#include <fstream>
+#include <streambuf>
+#include <dinput.h>
+#include <tchar.h>
+#include "ImGuiColorTextEdit/TextEditor.h"
+
+#include <filesystem>
+#include <lua.hpp>
+
+#include "EventSystem.h"
+#include "LuaScript.h"
+#include "World.h"
 
 // Main code
 int main(int, char**)
@@ -138,87 +152,25 @@ int main(int, char**)
 	ImGuiWindowFlags imgui_window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 	imgui_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	imgui_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != NULL);
-
 
     ///////////////////////////////////////////////////
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    unsigned int fbo;
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-    // generate texture
-    unsigned int textureColorbuffer;
-    glGenTextures(1, &textureColorbuffer);
-    glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 200, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // attach it to currently bound framebuffer object
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorbuffer, 0);
-
-    //unsigned int rbo;
-    //glGenRenderbuffers(1, &rbo);
-    //glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1366, 768);
-    //glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-    //glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-    //if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    //    std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     ///////////////////////////////////////////////////
     {
-	    float positions[]{
-	         50.0f,  00.0f, 1.0f, 0.0f,
-	    	 00.0f,  00.0f, 0.0f, 0.0f,
-	         50.0f,  50.0f, 1.0f, 1.0f,
-	         00.0f,  50.0f, 0.0f, 1.0f
-	    };
 
-	    uint32_t indices[] = {
-	        0, 1, 2,
-	        1, 2, 3
-	    };
 
-        VertexArray va;
-	    VertexBuffer vb(positions, 4 * 4 * sizeof(float));
-
-        VertexBufferLayout layout;
-		layout.Push<float>(2);
-		layout.Push<float>(2);
-        va.AddBuffer(vb, layout);
-		
-	    IndexBuffer ib(indices, 6);
 
 		int wx, wy;
 		SDL_GetWindowSize(window, &wx, &wy);
+		glm::mat4 proj = glm::ortho(0.0f, (float)wx, 0.0f, (float)wy, -1.0f, 1.0f);
 
-		glm::mat4 proj	= glm::ortho(0.0f, (float)wx, 0.0f, (float)wy, -1.0f, 1.0f);
-		glm::mat4 view	= glm::translate(glm::mat4(1.0f), glm::vec3(200, 200, 0));
-		glm::mat4 model = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0)), glm::vec3(5, 5, 5));
-		;
+		//glm::mat4 view	= glm::translate(glm::mat4(1.0f), glm::vec3(100, 100, 0));
+		//glm::mat4 model = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, 0)), glm::vec3(5, 5, 5));
 
-		glm::mat4 MVP = proj * view * model;
+		//glm::mat4 MVP = proj * view * model;
 
 		Log::GetInstance().AddLog(std::to_string(wx) + " - " + std::to_string(wy));
 
@@ -226,18 +178,83 @@ int main(int, char**)
 		shader.Bind();
 		//shader.SetUniform4f("u_Color", 0, 1, 1, 1);
 
-		Texture texture("./res/img/apple.png");
+		Texture texture("./res/img/tilemapV2.png");
 		texture.Bind(); 
     	shader.SetUniform1i("u_Texture", 0);
-		shader.SetUniformMat4f("u_MVP", MVP);
+		//shader.SetUniformMat4f("u_MVP", MVP);
+		TextureAtlases textureAtlases(&texture);
+		{
+			textureAtlases.ChangeEndPosition(4);
+			textureAtlases.Push(16);
+
+			textureAtlases.ChangeStartPosition(4);
+			textureAtlases.ChangeEndPosition(6);
+			textureAtlases.ResetPosition();
+			textureAtlases.Push(8);
+
+			textureAtlases.ChangeStartPosition(6);
+			textureAtlases.ChangeEndPosition(7);
+			textureAtlases.ResetPosition();
+			textureAtlases.Push(4);
+
+			textureAtlases.ChangeStartPosition(0, 4);
+			textureAtlases.ChangeEndPosition(4, 8);
+			textureAtlases.ResetPosition();
+			textureAtlases.Push(16);
+
+			textureAtlases.ChangeStartPosition(6, 0);
+			textureAtlases.ChangeEndPosition(10);
+			textureAtlases.ResetPosition();
+			textureAtlases.Push(6);
+		}
+
+		World word(textureAtlases);
+		std::cout << SDL_GetBasePath() << std::endl;
+
+		std::string worldPath = SDL_GetBasePath();
+		worldPath += "world1-1.txt";
+
+		word.ReadFile(worldPath);
+
+		TextureAtlasesGui textureAtlasesGui(textureAtlases);
+
+		//SubTexture& subTexture = SubTexture::Create({ 16.0f / 160 * 0, 16.0f / 160 * 9 }, { 16.0f / 160, 16.0f / 160 });
+		//SubTexture& subTexture1 = SubTexture::Create({ 16.0f / 160 * 1, 16.0f / 160 * 9 }, { 16.0f / 160, 16.0f / 160 });
 
 		shader.Unbind();
-		va.Unbind();
-		ib.Unbind();
-		vb.Unbind();
+		//va.Unbind();
+		//ib.Unbind();
+		//vb.Unbind();
+
+		BatchRenderer batchRenderer;
 		
 		Renderer renderer;
-	    // Main loop
+
+		Mouse mouse;
+
+
+
+		///////////////////////////////////////////////////////////////////////
+		// TEXT EDITOR SAMPLE
+
+		std::string fileToEdit = SDL_GetBasePath();
+		fileToEdit += "main.lua";
+
+		TextEditor editor;
+		auto lang = TextEditor::LanguageDefinition::Lua();
+		editor.SetLanguageDefinition(lang);
+
+    	LuaScript luaScript(fileToEdit);
+		{
+			std::ifstream t(fileToEdit);
+			if (t.good())
+			{
+				std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+				editor.SetText(str);
+			}
+		}
+		EventSystem eventSystem;
+    	// Main loop
 	    bool done = false;
 	    while (!done)
 	    {
@@ -251,25 +268,132 @@ int main(int, char**)
 	        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
 	        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
 	        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-	        SDL_Event event;
+
+
+
+			static glm::vec3 viewTran = glm::vec3(.0f, .0f, .0f);
+			static glm::vec3 viewTranTemp = glm::vec3(.0f, .0f, .0f);
+
+			static float zoom = 3.0f;
+			
+	    	static glm::vec3 mousePos = glm::vec3(.0f, .0f, .0f);
+
+			static bool lctrl = false, rctrl = false;
+
+			ImGui::Begin("Event Heandler");
+
+			static int mousex = 0;
+			static int mousey = 0;
+			bool dontImGuiEvent = true;
+			//eventSystem.ProcessEvent();
+			SDL_Event event;
 	        while (SDL_PollEvent(&event))
 	        {
-	            ImGui_ImplSDL2_ProcessEvent(&event);
-	            if (event.type == SDL_QUIT)
-	                done = true;
-	            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
-	                done = true;
-				if (event.type == SDL_KEYDOWN){
+				ImGui_ImplSDL2_ProcessEvent(&event);
+				switch (event.type) {
+				case SDL_QUIT:
+						done = true;
+				case SDL_WINDOWEVENT:
+					if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+						done = true;
+					if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
+						wx = event.window.data1;
+						wy = event.window.data2;
+						//SDL_GetWindowSize(window, &wx, &wy);
+						proj = glm::ortho(0.0f, (float)wx, 0.0f, (float)wy, -1.0f, 1.0f);
+						glViewport(0, 0, wx, wy);
+						Log::GetInstance().AddLog(std::to_string(wx) + " - " + std::to_string(wy));
+						//glViewport(0, 0, event.window.data1, event.window.data2);
+					}
+				case SDL_KEYDOWN:
 					switch (event.key.keysym.sym) {
-						case SDLK_ESCAPE:
-							done = true;
-							break;
+					case SDLK_ESCAPE:
+						done = true;
+						break;
+					case SDLK_RCTRL:
+						rctrl = true;
+						break;
+					case SDLK_LCTRL:
+						lctrl = true;
+						break;
+					}
+					break;
+				case SDL_KEYUP:
+					switch (event.key.keysym.sym) {
+					case SDLK_RCTRL:
+						rctrl = false;
+						break;
+					case SDLK_LCTRL:
+						lctrl = false;
+						break;
+					}
+					break;
+				case SDL_MOUSEBUTTONDOWN:
+					mouse.MouseDown(event.button);
+					if (event.button.button == SDL_BUTTON_LEFT) {
+						auto item = textureAtlasesGui.GetSelectedItem();
+						if (item == -1)
+						{
+							word.layers["arka"].DeleteBlockByPositio({mousex, mousey});
 						}
+						else
+						{
+							word.layers["arka"].blocks[item].push_back({mousex, mousey});
+						}
+					}
+					viewTranTemp = viewTran;
+					break;
+				case SDL_MOUSEMOTION:
+					mousePos.x = event.button.x;
+					mousePos.y = wy - event.button.y;
+					mouse.MouseMove(event.button, [](Mouse::MousePos mp)
+					{
+						viewTran.x = viewTranTemp.x + mp.x;
+						viewTran.y = viewTranTemp.y + mp.y;
+					});
+
+					mousex = (mousePos.x - viewTran.x) * 1 / zoom;
+					mousey = (mousePos.y - viewTran.y) * 1 / zoom;
+					if (mousex < 0) mousex -= 16;
+					if (mousey < 0) mousey -= 16;
+					mousex -= mousex % 16;
+					mousey -= mousey % 16;
+					break;
+				case SDL_MOUSEBUTTONUP:
+					mouse.MouseUp(event.button);
+					break;
+				case SDL_MOUSEWHEEL:
+					if(lctrl)
+					{
+						mouse.MouseWheelScroll(event.wheel, [](int weel)
+							{
+								float incr = (float)zoom / 3.0f;
+								if (weel < 0)
+									incr *= -1;
+								if (weel < 0 && zoom + incr <= 0)
+									return;
+
+								zoom += incr;
+							});
+					}
 					break;
 				}
 	        }
+			//if(dontImGuiEvent) ImGui_ImplSDL2_ProcessEvent(&event);
 
+			ImGui::Text("%d - %d", lctrl, rctrl);
+			ImGui::Text("%f - %f", mousePos.x, mousePos.y);
+			ImGui::Text("%f", zoom);
+	    	ImGui::End();
 
+			glm::mat4 view = glm::mat4(1.0f);
+			
+			view = glm::translate(view, viewTran);
+			view = glm::scale(view, glm::vec3(zoom, zoom, 1.0f));
+
+			glm::mat4 MVP = proj * view;
+			shader.Bind();
+			shader.SetUniformMat4f("u_MVP", MVP);
 
 			//---------------PENCEREDE OPENGL-------------------
 	        //glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -288,19 +412,20 @@ int main(int, char**)
 
 
 
-			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-			glEnable(GL_DEPTH_TEST);
-			//glViewport(0, 0, 200, 200);
-			//glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-			
-			glClearColor(0.0f, 1.0f, 0.3f, 1.0f);
-			renderer.Clear();
-			
-			shader.Bind();
-			renderer.Draw(va, ib, shader);
+			//glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+			//glEnable(GL_DEPTH_TEST);
+			////glViewport(0, 0, 200, 200);
+			////glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+			//
+			//glClearColor(0.0f, 1.0f, 0.3f, 1.0f);
+			//renderer.Clear();
+			//
+			//shader.Bind();
+			//renderer.Draw(va, ib, shader);
 
 
 
+			//glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glDisable(GL_DEPTH_TEST);
 			//glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
@@ -309,14 +434,52 @@ int main(int, char**)
 			renderer.Clear();
 
 			shader.Bind();
-			renderer.Draw(va,ib,shader);
+			//renderer.Draw(va,ib,shader);
+
+	    	batchRenderer.BeginBatch();
+
+	    	word.RenderWorld(batchRenderer);
+
+			auto item = textureAtlasesGui.GetSelectedItem();
+			if (item == -1)
+				batchRenderer.DrawQuad({ mousex, mousey }, { 16,16 }, textureAtlases.subTextures[word.blockNames["redBox"] % (textureAtlases.Size())]);
+			else
+				batchRenderer.DrawQuad({ mousex, mousey }, { 16,16 }, textureAtlases.subTextures[item % (textureAtlases.Size())]);
 
 
+			batchRenderer.EndBatch();
+
+			batchRenderer.Draw();
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
+			luaScript.Update();
 
 
+	    	//int mousex = (mousePos.x - viewTran.x) * 1 / zoom;
+			//int mousey = (mousePos.y - viewTran.y) * 1 / zoom;
+			//if (mousex < 0) mousex -= 16;
+			//if (mousey < 0) mousey -= 16;
+			//mousex -= mousex % 16;
+			//mousey -= mousey % 16;
 
+			ImGui::Text("Mouse -> %d, %d", mousex, mousey);
+			//static int batchx = 200;
+			//static int batchy = 204;
+			//for (int y = 0; y < batchy; y++)
+			//{
+			//	for (int x = 0; x < batchx; x++)
+			//	{
+			//		batchRenderer.DrawQuad({ x*50, y*50 }, { 50,50 }, textureAtlases.subTextures[((y * batchy) + x) % (textureAtlases.Size())]);
+			//	}
+			//}
+			//batchRenderer.DrawQuad({ 0, 0 }, { 16,16 }, textureAtlases.subTextures[0 % (textureAtlases.Size())]);
+
+			//static char buf1[64] = "200"; ImGui::InputText("X", buf1, 64, ImGuiInputTextFlags_CharsDecimal);
+			//static char buf2[64] = "204"; ImGui::InputText("Y", buf2, 64, ImGuiInputTextFlags_CharsDecimal);
+			//if(*buf1 != 0) batchx = std::stoi(buf1);
+			//if(*buf2 != 0) batchy = std::stoi(buf2);
 
 
 	        static bool ViewWindow[] = { true, true, true };
@@ -383,23 +546,93 @@ int main(int, char**)
 	        }
 
 
+			//////////////////////////
+			
+			auto cpos = editor.GetCursorPosition();
+			ImGui::Begin("Text Editor Demo", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar);
+			ImGui::SetWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+			if (ImGui::BeginMenuBar())
+			{
+				if (ImGui::BeginMenu("File"))
+				{
+					if (ImGui::MenuItem("Save", "Ctrl-S"))
+					{
+						auto textToSave = editor.GetText();
+						/// save text....
+						{
+							std::fstream t(fileToEdit, std::ios::out | std::ios::trunc);
+							if (t.good())
+							{
+								t << textToSave;
+							}
+						}
+					}
+					if (ImGui::MenuItem("Quit Editor", "Alt-F4"))
+						;//break;///////////////////////////////////////////////////
+					ImGui::EndMenu();
+				}
+				if (ImGui::BeginMenu("Edit"))
+				{
+					bool ro = editor.IsReadOnly();
+					if (ImGui::MenuItem("Read-only mode", nullptr, &ro))
+						editor.SetReadOnly(ro);
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, !ro && editor.CanUndo()))
+						editor.Undo();
+					if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, !ro && editor.CanRedo()))
+						editor.Redo();
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, editor.HasSelection()))
+						editor.Copy();
+					if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, !ro && editor.HasSelection()))
+						editor.Cut();
+					if (ImGui::MenuItem("Delete", "Del", nullptr, !ro && editor.HasSelection()))
+						editor.Delete();
+					if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, !ro && ImGui::GetClipboardText() != nullptr))
+						editor.Paste();
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Select all", nullptr, nullptr))
+						editor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(editor.GetTotalLines(), 0));
+
+					ImGui::EndMenu();
+				}
+				ImGui::EndMenuBar();
+			}
+
+			ImGui::Text("%6d/%-6d %6d lines  | %s | %s | %s | %s", cpos.mLine + 1, cpos.mColumn + 1, editor.GetTotalLines(),
+				editor.IsOverwrite() ? "Ovr" : "Ins",
+				editor.CanUndo() ? "*" : " ",
+				editor.GetLanguageDefinition().mName.c_str(), fileToEdit.c_str());
+
+			editor.Render("TextEditor");
+			ImGui::End();
+
+			//////////////////////////
 
 
 
 
 
 
-
-
+			textureAtlasesGui.RenderImGui();
+			Layer::RenderImGui(word);
 
 
 	        ImGui::Begin("Viewport");
-	        ImVec2 wsize = ImGui::GetWindowSize();
-	        wsize.y -= 35;
-	        wsize.y = 200;
-	        wsize.x = 200;
-	        ImGui::Image((ImTextureID)textureColorbuffer, wsize, ImVec2(0, 1), ImVec2(1, 0));
+			//ImGui::Image((ImTextureID)textureColorbuffer, wsize, ImVec2(0.2f, 0.31f), ImVec2(0.25f, 0.25f));
+			//ImGui::Image((ImTextureID)textureColorbuffer, ImVec2{ 160.f, 160.f }, ImVec2(0, 1), ImVec2(1, 0));
+			//ImGui::Image((ImTextureID)textureColorbuffer, wsize, ImVec2(16.0f / 160.0f * 0, 1), ImVec2(16.0f / 160.0f * 1, 16.0f / 160.0f * 9));
+			//sol üst ----- sağ alt
+			//ImGui::Image((ImTextureID)textureAtlases.GetTextureId(), {200,200}, 
+			//	ImVec2(textureAtlases.subTextures[0].imageCoord[3].x, textureAtlases.subTextures[0].imageCoord[3].y),
+			//	ImVec2(textureAtlases.subTextures[0].imageCoord[0].x, textureAtlases.subTextures[0].imageCoord[0].y));
 	        ImGui::End();
+
 
 	        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
 	        ImGui::ShowDemoWindow();
@@ -414,7 +647,7 @@ int main(int, char**)
 
 
 
-
+			shader.Bind();
 	        // Rendering
 	        ImGui::Render();
 	        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
