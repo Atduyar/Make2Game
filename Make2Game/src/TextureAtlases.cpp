@@ -7,9 +7,9 @@ SubTexture& SubTexture::Create(glm::vec2 position, glm::vec2 nomalizeSize, const
 {
 	SubTexture* subTexture = new SubTexture;
 	subTexture->imageCoord[0] = { position.x + nomalizeSize.x		, position.y };
-	subTexture->imageCoord[1] = { position.x							, position.y };
+	subTexture->imageCoord[1] = { position.x						, position.y };
 	subTexture->imageCoord[2] = { position.x + nomalizeSize.x		, position.y + nomalizeSize.y };
-	subTexture->imageCoord[3] = { position.x							, position.y + nomalizeSize.y };
+	subTexture->imageCoord[3] = { position.x						, position.y + nomalizeSize.y };
 
 	subTexture->size = nomalizeSize * imageSize;
 	

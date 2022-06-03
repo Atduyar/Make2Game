@@ -42,15 +42,33 @@
 #include <filesystem>
 #include <lua.hpp>
 
-#include "EventSystem.h"
+#include "App.h"
 #include "LuaScript.h"
 #include "World.h"
+#include "Project.h"
+
+
+App *app = new App;
+
+Project* project = nullptr;
 
 // Main code
 int main(int, char**)
 {
+
 #ifdef _WIN32
     SetProcessDPIAware();// Fix DPI settings
+
+	{//set console positoin
+		HWND hwndScreen = GetDesktopWindow();
+		HWND consoleWindow = GetConsoleWindow();
+
+		RECT rectWindow;
+		GetWindowRect(consoleWindow, &rectWindow);
+		int posy = GetSystemMetrics(SM_CYSCREEN) / 2 - (rectWindow.bottom - rectWindow.top) / 2;
+	
+		SetWindowPos(consoleWindow, 0, 0, posy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	}
 #endif
     // Setup SDL
     // (Some versions of SDL before <2.0.10 appears to have performance/stalling issues on a minority of Windows systems,
@@ -141,6 +159,7 @@ int main(int, char**)
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
     }
+	io.ConfigWindowsMoveFromTitleBarOnly = true;
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -152,7 +171,7 @@ int main(int, char**)
 	ImGuiWindowFlags imgui_window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 	imgui_window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	imgui_window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
-
+	
     ///////////////////////////////////////////////////
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -207,6 +226,13 @@ int main(int, char**)
 			textureAtlases.ResetPosition();
 			textureAtlases.Push(6);
 		}
+		app->textureAtlases = &textureAtlases;
+
+
+		//FrameBuffer mapEditorFrameBuffer;
+		//TextureBuffer mapEditorTextureBuffer(1,1);
+		//mapEditorFrameBuffer.AttachTexture(mapEditorTextureBuffer);
+		//mapEditorTextureBuffer.Unbind();
 
 		World word(textureAtlases);
 		std::cout << SDL_GetBasePath() << std::endl;
@@ -227,8 +253,9 @@ int main(int, char**)
 		//vb.Unbind();
 
 		BatchRenderer batchRenderer;
-		
 		Renderer renderer;
+		app->batchRenderer = &batchRenderer;
+		app->renderer = &renderer;
 
 		Mouse mouse;
 
@@ -237,23 +264,26 @@ int main(int, char**)
 		///////////////////////////////////////////////////////////////////////
 		// TEXT EDITOR SAMPLE
 
-		std::string fileToEdit = SDL_GetBasePath();
-		fileToEdit += "main.lua";
+		//std::string fileToEdit = SDL_GetBasePath();
+		//fileToEdit += "main.lua";
 
-		TextEditor editor;
-		auto lang = TextEditor::LanguageDefinition::Lua();
-		editor.SetLanguageDefinition(lang);
+		//TextEditor editor;
+		//auto lang = TextEditor::LanguageDefinition::Lua();
+		//editor.SetLanguageDefinition(lang);
 
-    	LuaScript luaScript(fileToEdit);
-		{
-			std::ifstream t(fileToEdit);
-			if (t.good())
-			{
-				std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-				editor.SetText(str);
-			}
-		}
-		EventSystem eventSystem;
+		//LuaScript luaScript(fileToEdit);
+		//{
+		//	std::ifstream t(fileToEdit);
+		//	if (t.good())
+		//	{
+		//		std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+		//		editor.SetText(str);
+		//	}
+		//}
+
+		project = new Project("C:/Users/atduy/Desktop/M2G_Project");
+		//Project->Start();
+		project->Unbind();
     	// Main loop
 	    bool done = false;
 	    while (!done)
@@ -284,17 +314,19 @@ int main(int, char**)
 
 			static int mousex = 0;
 			static int mousey = 0;
-			bool dontImGuiEvent = true;
-			//eventSystem.ProcessEvent();
+
 			SDL_Event event;
 	        while (SDL_PollEvent(&event))
 	        {
 				ImGui_ImplSDL2_ProcessEvent(&event);
+				auto& io = ImGui::GetIO();
+
+
 				switch (event.type) {
 				case SDL_QUIT:
-						done = true;
+					done = true;
 				case SDL_WINDOWEVENT:
-					if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+					if (event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
 						done = true;
 					if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
 						wx = event.window.data1;
@@ -328,6 +360,18 @@ int main(int, char**)
 						break;
 					}
 					break;
+				}
+
+				if (project->isRuning)
+				{
+					project->Input(event);
+				}
+
+				if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
+					continue;
+				}
+
+	        	switch (event.type) {
 				case SDL_MOUSEBUTTONDOWN:
 					mouse.MouseDown(event.button);
 					if (event.button.button == SDL_BUTTON_LEFT) {
@@ -379,7 +423,6 @@ int main(int, char**)
 					break;
 				}
 	        }
-			//if(dontImGuiEvent) ImGui_ImplSDL2_ProcessEvent(&event);
 
 			ImGui::Text("%d - %d", lctrl, rctrl);
 			ImGui::Text("%f - %f", mousePos.x, mousePos.y);
@@ -434,6 +477,7 @@ int main(int, char**)
 			renderer.Clear();
 
 			shader.Bind();
+			texture.Bind();
 			//renderer.Draw(va,ib,shader);
 
 	    	batchRenderer.BeginBatch();
@@ -451,10 +495,13 @@ int main(int, char**)
 
 			batchRenderer.Draw();
 
+
+
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+			project->GameLoop(batchRenderer, textureAtlases);
 
-			luaScript.Update();
+			//luaScript.Update();
 
 
 	    	//int mousex = (mousePos.x - viewTran.x) * 1 / zoom;
@@ -542,75 +589,79 @@ int main(int, char**)
 	                ImGui::EndMenu();
 	            }
 
+				ImGui::SetCursorPosX((ImGui::GetWindowSize().x - ImGui::GetFontSize()*3) / 2);
+				if (ImGui::Button("||>")) {
+					project->Toggle();
+				}
+
 	            ImGui::EndMenuBar();
 	        }
 
 
 			//////////////////////////
-			
-			auto cpos = editor.GetCursorPosition();
-			ImGui::Begin("Text Editor Demo", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar);
-			ImGui::SetWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-			if (ImGui::BeginMenuBar())
-			{
-				if (ImGui::BeginMenu("File"))
-				{
-					if (ImGui::MenuItem("Save", "Ctrl-S"))
-					{
-						auto textToSave = editor.GetText();
-						/// save text....
-						{
-							std::fstream t(fileToEdit, std::ios::out | std::ios::trunc);
-							if (t.good())
-							{
-								t << textToSave;
-							}
-						}
-					}
-					if (ImGui::MenuItem("Quit Editor", "Alt-F4"))
-						;//break;///////////////////////////////////////////////////
-					ImGui::EndMenu();
-				}
-				if (ImGui::BeginMenu("Edit"))
-				{
-					bool ro = editor.IsReadOnly();
-					if (ImGui::MenuItem("Read-only mode", nullptr, &ro))
-						editor.SetReadOnly(ro);
-					ImGui::Separator();
 
-					if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, !ro && editor.CanUndo()))
-						editor.Undo();
-					if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, !ro && editor.CanRedo()))
-						editor.Redo();
+			project->CodeEditor();
 
-					ImGui::Separator();
+			//auto cpos = editor.GetCursorPosition();
+			//ImGui::Begin("Text Editor Demo", nullptr, ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_MenuBar);
+			//ImGui::SetWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+			//if (ImGui::BeginMenuBar())
+			//{
+			//	if (ImGui::BeginMenu("File"))
+			//	{
+			//		if (ImGui::MenuItem("Save", "Ctrl-S"))
+			//		{
+			//			auto textToSave = editor.GetText();
+			//			/// save text....
+			//			{
+			//				std::fstream t(fileToEdit, std::ios::out | std::ios::trunc);
+			//				if (t.good())
+			//				{
+			//					t << textToSave;
+			//				}
+			//			}
+			//		}
+			//		if (ImGui::MenuItem("Quit Editor", "Alt-F4"))
+			//			;//break;///////////////////////////////////////////////////
+			//		ImGui::EndMenu();
+			//	}
+			//	if (ImGui::BeginMenu("Edit"))
+			//	{
+			//		bool ro = editor.IsReadOnly();
 
-					if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, editor.HasSelection()))
-						editor.Copy();
-					if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, !ro && editor.HasSelection()))
-						editor.Cut();
-					if (ImGui::MenuItem("Delete", "Del", nullptr, !ro && editor.HasSelection()))
-						editor.Delete();
-					if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, !ro && ImGui::GetClipboardText() != nullptr))
-						editor.Paste();
+			//		if (ImGui::MenuItem("Undo", "ALT-Backspace", nullptr, !ro && editor.CanUndo()))
+			//			editor.Undo();
+			//		if (ImGui::MenuItem("Redo", "Ctrl-Y", nullptr, !ro && editor.CanRedo()))
+			//			editor.Redo();
 
-					ImGui::Separator();
+			//		ImGui::Separator();
 
-					if (ImGui::MenuItem("Select all", nullptr, nullptr))
-						editor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(editor.GetTotalLines(), 0));
+			//		if (ImGui::MenuItem("Copy", "Ctrl-C", nullptr, editor.HasSelection()))
+			//			editor.Copy();
+			//		if (ImGui::MenuItem("Cut", "Ctrl-X", nullptr, !ro && editor.HasSelection()))
+			//			editor.Cut();
+			//		if (ImGui::MenuItem("Delete", "Del", nullptr, !ro && editor.HasSelection()))
+			//			editor.Delete();
+			//		if (ImGui::MenuItem("Paste", "Ctrl-V", nullptr, !ro && ImGui::GetClipboardText() != nullptr))
+			//			editor.Paste();
 
-					ImGui::EndMenu();
-				}
-				ImGui::EndMenuBar();
-			}
+			//		ImGui::Separator();
 
-			ImGui::Text("%6d/%-6d %6d lines  | %s | %s | %s | %s", cpos.mLine + 1, cpos.mColumn + 1, editor.GetTotalLines(),
-				editor.IsOverwrite() ? "Ovr" : "Ins",
-				editor.CanUndo() ? "*" : " ",
-				editor.GetLanguageDefinition().mName.c_str(), fileToEdit.c_str());
+			//		if (ImGui::MenuItem("Select all", nullptr, nullptr))
+			//			editor.SetSelection(TextEditor::Coordinates(), TextEditor::Coordinates(editor.GetTotalLines(), 0));
 
-			editor.Render("TextEditor");
-			ImGui::End();
+			//		ImGui::EndMenu();
+			//	}
+			//	ImGui::EndMenuBar();
+			//}
+
+			//ImGui::Text("%6d/%-6d %6d lines  | %s | %s | %s | %s", cpos.mLine + 1, cpos.mColumn + 1, editor.GetTotalLines(),
+			//	editor.IsOverwrite() ? "Ovr" : "Ins",
+			//	editor.CanUndo() ? "*" : " ",
+			//	editor.GetLanguageDefinition().mName.c_str(), fileToEdit.c_str());
+
+			//editor.Render("TextEditor");
+			//ImGui::End();
 
 			//////////////////////////
 
@@ -623,7 +674,7 @@ int main(int, char**)
 			Layer::RenderImGui(word);
 
 
-	        ImGui::Begin("Viewport");
+	        //ImGui::Begin("Viewport");
 			//ImGui::Image((ImTextureID)textureColorbuffer, wsize, ImVec2(0.2f, 0.31f), ImVec2(0.25f, 0.25f));
 			//ImGui::Image((ImTextureID)textureColorbuffer, ImVec2{ 160.f, 160.f }, ImVec2(0, 1), ImVec2(1, 0));
 			//ImGui::Image((ImTextureID)textureColorbuffer, wsize, ImVec2(16.0f / 160.0f * 0, 1), ImVec2(16.0f / 160.0f * 1, 16.0f / 160.0f * 9));
@@ -631,7 +682,7 @@ int main(int, char**)
 			//ImGui::Image((ImTextureID)textureAtlases.GetTextureId(), {200,200}, 
 			//	ImVec2(textureAtlases.subTextures[0].imageCoord[3].x, textureAtlases.subTextures[0].imageCoord[3].y),
 			//	ImVec2(textureAtlases.subTextures[0].imageCoord[0].x, textureAtlases.subTextures[0].imageCoord[0].y));
-	        ImGui::End();
+	        //ImGui::End();
 
 
 	        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).

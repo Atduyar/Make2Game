@@ -443,7 +443,7 @@ union GL3WProcs {
         PFNGLATTACHSHADERPROC            AttachShader;
         PFNGLBINDBUFFERPROC              BindBuffer;
         PFNGLBINDSAMPLERPROC             BindSampler;
-        PFNGLBINDTEXTUREPROC             BindTexture;
+        PFNGLBINDTEXTUREPROC             BindTexture    ;
         PFNGLBINDVERTEXARRAYPROC         BindVertexArray;
         PFNGLBLENDEQUATIONPROC           BlendEquation;
         PFNGLBLENDEQUATIONSEPARATEPROC   BlendEquationSeparate;

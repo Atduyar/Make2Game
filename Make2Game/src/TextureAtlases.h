@@ -3,12 +3,25 @@
 #include "glm/vec2.hpp"
 
 
+class SubTexturee
+{
+public:
+	glm::vec2 imageCoord[4];
+};
+
 class SubTexture
 {
 public:
 	glm::vec2 imageCoord[4];
 	glm::vec2 size;
 	static SubTexture& Create(glm::vec2 position, glm::vec2 size, const glm::vec2& imageSize);
+	inline SubTexture() {}
+	inline SubTexture(SubTexturee subTexturee) {
+		imageCoord[0] = subTexturee.imageCoord[0];
+		imageCoord[1] = subTexturee.imageCoord[1];
+		imageCoord[2] = subTexturee.imageCoord[2];
+		imageCoord[3] = subTexturee.imageCoord[3];
+	}
 };
 
 
